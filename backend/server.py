@@ -7,7 +7,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
 import bcrypt
@@ -28,6 +28,8 @@ app = FastAPI()
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
 
+SECTORS = ['chores', 'fitness', 'learning', 'mind', 'faith', 'cooking']
+
 # Models
 class UserRegister(BaseModel):
     email: EmailStr
@@ -39,7 +41,7 @@ class UserLogin(BaseModel):
     password: str
 
 class User(BaseModel):
-    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
+    model_config = ConfigDict(extra="ignore")
     id: str
     email: str
     username: str
@@ -50,39 +52,70 @@ class User(BaseModel):
     last_active: str
     group_id: Optional[str] = None
     theme: str = "playful"
-    chore_xp: int = 0
-    chore_level: int = 1
-    chore_coins: int = 0
+    
+    chores_xp: int = 0
+    chores_level: int = 1
+    chores_coins: int = 0
+    
+    fitness_xp: int = 0
+    fitness_level: int = 1
+    fitness_coins: int = 0
+    
+    learning_xp: int = 0
+    learning_level: int = 1
+    learning_coins: int = 0
+    
+    mind_xp: int = 0
+    mind_level: int = 1
+    mind_coins: int = 0
+    
+    faith_xp: int = 0
+    faith_level: int = 1
+    faith_coins: int = 0
+    
+    cooking_xp: int = 0
+    cooking_level: int = 1
+    cooking_coins: int = 0
+    
+    achievements: List[str] = []
+    pets_owned: List[str] = []
+    music_player_owned: bool = False
+    music_tracks_owned: List[str] = []
 
-class ChoreCreate(BaseModel):
+class ActivityCreate(BaseModel):
     title: str
     description: Optional[str] = ""
     duration: int
+    sector: str
 
-class Chore(BaseModel):
-    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
+class Activity(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     id: str
     user_id: str
+    sector: str
     title: str
     description: str
     xp_earned: int
     coins_earned: int
-    chore_xp_earned: int
-    chore_coins_earned: int
+    sector_xp_earned: int
+    sector_coins_earned: int
     duration: int
     completed_at: str
 
 class ShopItem(BaseModel):
-    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
+    model_config = ConfigDict(extra="ignore")
     id: str
     name: str
     type: str
+    sector: Optional[str] = None
     cost: int
+    coin_type: str
     description: str
     image_url: Optional[str] = None
 
 class PurchaseRequest(BaseModel):
     item_id: str
+    sector: Optional[str] = None
 
 class GroupCreate(BaseModel):
     name: str
@@ -91,7 +124,7 @@ class GroupJoin(BaseModel):
     code: str
 
 class Group(BaseModel):
-    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
+    model_config = ConfigDict(extra="ignore")
     id: str
     name: str
     code: str
@@ -100,10 +133,18 @@ class Group(BaseModel):
     created_at: str
 
 class LeaderboardEntry(BaseModel):
-    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
+    model_config = ConfigDict(extra="ignore")
     username: str
     xp: int
     level: int
+
+class Achievement(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    name: str
+    description: str
+    icon: str
+    requirement: Dict[str, Any]
 
 # Helper functions
 def hash_password(password: str) -> str:
@@ -140,6 +181,25 @@ def calculate_level(xp: int) -> int:
 def calculate_xp_for_duration(duration_seconds: int) -> int:
     return max(10, duration_seconds // 60)
 
+async def check_achievements(user: User) -> List[str]:
+    new_achievements = []
+    
+    achievements_def = [
+        {"id": "first_activity", "name": "First Steps", "check": lambda u: u.accountable_xp > 0},
+        {"id": "level_5", "name": "Rising Star", "check": lambda u: u.accountable_level >= 5},
+        {"id": "level_10", "name": "Dedicated", "check": lambda u: u.accountable_level >= 10},
+        {"id": "streak_7", "name": "Week Warrior", "check": lambda u: u.streak >= 7},
+        {"id": "streak_30", "name": "Month Master", "check": lambda u: u.streak >= 30},
+        {"id": "all_sectors", "name": "Renaissance", "check": lambda u: all([getattr(u, f"{s}_xp") > 0 for s in SECTORS])},
+        {"id": "rich", "name": "Wealthy", "check": lambda u: u.coins >= 1000},
+    ]
+    
+    for ach in achievements_def:
+        if ach["id"] not in user.achievements and ach["check"](user):
+            new_achievements.append(ach["id"])
+    
+    return new_achievements
+
 # Auth routes
 @api_router.post("/auth/register")
 async def register(user_data: UserRegister):
@@ -160,31 +220,23 @@ async def register(user_data: UserRegister):
         "last_active": datetime.now(timezone.utc).isoformat(),
         "group_id": None,
         "theme": "playful",
-        "chore_xp": 0,
-        "chore_level": 1,
-        "chore_coins": 0
+        "chores_xp": 0, "chores_level": 1, "chores_coins": 0,
+        "fitness_xp": 0, "fitness_level": 1, "fitness_coins": 0,
+        "learning_xp": 0, "learning_level": 1, "learning_coins": 0,
+        "mind_xp": 0, "mind_level": 1, "mind_coins": 0,
+        "faith_xp": 0, "faith_level": 1, "faith_coins": 0,
+        "cooking_xp": 0, "cooking_level": 1, "cooking_coins": 0,
+        "achievements": [],
+        "pets_owned": [],
+        "music_player_owned": False,
+        "music_tracks_owned": []
     }
     
     await db.users.insert_one(user_doc)
     token = create_access_token({"sub": user_id})
     
-    # Create clean user response without MongoDB ObjectId
-    user_response = User(
-        id=user_id,
-        email=user_data.email,
-        username=user_data.username,
-        accountable_xp=0,
-        accountable_level=1,
-        coins=0,
-        streak=0,
-        last_active=datetime.now(timezone.utc).isoformat(),
-        group_id=None,
-        theme="playful",
-        chore_xp=0,
-        chore_level=1,
-        chore_coins=0
-    )
-    return {"token": token, "user": user_response.model_dump()}
+    user_response = {k: v for k, v in user_doc.items() if k != "password"}
+    return {"token": token, "user": user_response}
 
 @api_router.post("/auth/login")
 async def login(user_data: UserLogin):
@@ -193,10 +245,8 @@ async def login(user_data: UserLogin):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     token = create_access_token({"sub": user["id"]})
-    
-    # Create clean user response
-    user_response = User(**{k: v for k, v in user.items() if k != "password"})
-    return {"token": token, "user": user_response.model_dump()}
+    user_response = {k: v for k, v in user.items() if k != "password"}
+    return {"token": token, "user": user_response}
 
 # User routes
 @api_router.get("/user/profile", response_model=User)
@@ -208,35 +258,43 @@ async def update_theme(theme: dict, current_user: User = Depends(get_current_use
     await db.users.update_one({"id": current_user.id}, {"$set": {"theme": theme["theme"]}})
     return {"success": True}
 
-# Chore routes
-@api_router.post("/chores", response_model=Chore)
-async def create_chore(chore_data: ChoreCreate, current_user: User = Depends(get_current_user)):
-    xp_earned = calculate_xp_for_duration(chore_data.duration)
+# Generic Activity routes
+@api_router.post("/activities", response_model=Activity)
+async def create_activity(activity_data: ActivityCreate, current_user: User = Depends(get_current_user)):
+    if activity_data.sector not in SECTORS:
+        raise HTTPException(status_code=400, detail="Invalid sector")
+    
+    xp_earned = calculate_xp_for_duration(activity_data.duration)
     coins_earned = xp_earned // 2
     
-    chore_id = str(uuid.uuid4())
-    chore_doc = {
-        "id": chore_id,
+    activity_id = str(uuid.uuid4())
+    activity_doc = {
+        "id": activity_id,
         "user_id": current_user.id,
-        "title": chore_data.title,
-        "description": chore_data.description,
+        "sector": activity_data.sector,
+        "title": activity_data.title,
+        "description": activity_data.description,
         "xp_earned": xp_earned,
         "coins_earned": coins_earned,
-        "chore_xp_earned": xp_earned,
-        "chore_coins_earned": coins_earned,
-        "duration": chore_data.duration,
+        "sector_xp_earned": xp_earned,
+        "sector_coins_earned": coins_earned,
+        "duration": activity_data.duration,
         "completed_at": datetime.now(timezone.utc).isoformat()
     }
     
-    await db.chores.insert_one(chore_doc)
+    await db.activities.insert_one(activity_doc)
+    
+    sector_xp_field = f"{activity_data.sector}_xp"
+    sector_coins_field = f"{activity_data.sector}_coins"
+    sector_level_field = f"{activity_data.sector}_level"
     
     new_accountable_xp = current_user.accountable_xp + xp_earned
     new_coins = current_user.coins + coins_earned
     new_accountable_level = calculate_level(new_accountable_xp)
     
-    new_chore_xp = current_user.chore_xp + xp_earned
-    new_chore_coins = current_user.chore_coins + coins_earned
-    new_chore_level = calculate_level(new_chore_xp)
+    new_sector_xp = getattr(current_user, sector_xp_field) + xp_earned
+    new_sector_coins = getattr(current_user, sector_coins_field) + coins_earned
+    new_sector_level = calculate_level(new_sector_xp)
     
     today = datetime.now(timezone.utc).date()
     last_active_date = datetime.fromisoformat(current_user.last_active).date()
@@ -248,41 +306,92 @@ async def create_chore(chore_data: ChoreCreate, current_user: User = Depends(get
     else:
         new_streak = 1
     
-    await db.users.update_one(
-        {"id": current_user.id},
-        {"$set": {
-            "accountable_xp": new_accountable_xp,
-            "accountable_level": new_accountable_level,
-            "coins": new_coins,
-            "chore_xp": new_chore_xp,
-            "chore_coins": new_chore_coins,
-            "chore_level": new_chore_level,
-            "streak": new_streak,
-            "last_active": datetime.now(timezone.utc).isoformat()
-        }}
-    )
+    update_doc = {
+        "accountable_xp": new_accountable_xp,
+        "accountable_level": new_accountable_level,
+        "coins": new_coins,
+        sector_xp_field: new_sector_xp,
+        sector_coins_field: new_sector_coins,
+        sector_level_field: new_sector_level,
+        "streak": new_streak,
+        "last_active": datetime.now(timezone.utc).isoformat()
+    }
     
-    return Chore(**chore_doc)
+    await db.users.update_one({"id": current_user.id}, {"$set": update_doc})
+    
+    updated_user = await db.users.find_one({"id": current_user.id}, {"_id": 0, "password": 0})
+    new_achievements = await check_achievements(User(**updated_user))
+    
+    if new_achievements:
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$push": {"achievements": {"$each": new_achievements}}}
+        )
+    
+    return Activity(**activity_doc)
 
-@api_router.get("/chores", response_model=List[Chore])
-async def get_chores(current_user: User = Depends(get_current_user)):
-    chores = await db.chores.find({"user_id": current_user.id}, {"_id": 0}).sort("completed_at", -1).to_list(100)
-    return chores
+@api_router.get("/activities/{sector}", response_model=List[Activity])
+async def get_activities(sector: str, current_user: User = Depends(get_current_user)):
+    if sector not in SECTORS:
+        raise HTTPException(status_code=400, detail="Invalid sector")
+    activities = await db.activities.find(
+        {"user_id": current_user.id, "sector": sector},
+        {"_id": 0}
+    ).sort("completed_at", -1).to_list(100)
+    return activities
 
 # Shop routes
-@api_router.get("/shop/items", response_model=List[ShopItem])
-async def get_shop_items():
-    items = await db.shop_items.find({}, {"_id": 0}).to_list(100)
+@api_router.get("/shop/items/{sector}", response_model=List[ShopItem])
+async def get_shop_items(sector: str):
+    if sector not in SECTORS and sector != "main":
+        raise HTTPException(status_code=400, detail="Invalid sector")
+    
+    items = await db.shop_items.find({"sector": sector}, {"_id": 0}).to_list(100)
+    
     if not items:
-        default_items = [
-            {"id": str(uuid.uuid4()), "name": "Double XP Boost", "type": "powerup", "cost": 50, "description": "2x XP for your next chore"},
-            {"id": str(uuid.uuid4()), "name": "Coin Bonus", "type": "powerup", "cost": 30, "description": "Extra 20 coins for your next chore"},
-            {"id": str(uuid.uuid4()), "name": "Streak Protection", "type": "powerup", "cost": 100, "description": "Protect your streak for 1 day"},
-            {"id": str(uuid.uuid4()), "name": "Ocean Theme", "type": "theme", "cost": 150, "description": "Calming ocean color scheme"},
-            {"id": str(uuid.uuid4()), "name": "Forest Background", "type": "background", "cost": 200, "description": "Beautiful forest scenery"}
-        ]
-        await db.shop_items.insert_many(default_items)
-        items = default_items
+        default_items = []
+        if sector == "chores":
+            default_items = [
+                {"id": str(uuid.uuid4()), "name": "Mop Pet", "type": "pet", "sector": "chores", "cost": 500, "coin_type": "chores_coins", "description": "A helpful mop that cleans up and gives XP bonuses"},
+                {"id": str(uuid.uuid4()), "name": "Double XP Boost", "type": "powerup", "sector": "chores", "cost": 50, "coin_type": "chores_coins", "description": "2x XP for your next chore"},
+                {"id": str(uuid.uuid4()), "name": "Clean Theme", "type": "theme", "sector": "chores", "cost": 150, "coin_type": "chores_coins", "description": "Spotless theme for chores"},
+            ]
+        elif sector == "fitness":
+            default_items = [
+                {"id": str(uuid.uuid4()), "name": "Dumbbell Pet", "type": "pet", "sector": "fitness", "cost": 500, "coin_type": "fitness_coins", "description": "Motivational workout buddy"},
+                {"id": str(uuid.uuid4()), "name": "Stamina Boost", "type": "powerup", "sector": "fitness", "cost": 50, "coin_type": "fitness_coins", "description": "2x XP for your next workout"},
+            ]
+        elif sector == "learning":
+            default_items = [
+                {"id": str(uuid.uuid4()), "name": "Book Pet", "type": "pet", "sector": "learning", "cost": 500, "coin_type": "learning_coins", "description": "Wise companion for learning"},
+                {"id": str(uuid.uuid4()), "name": "Focus Boost", "type": "powerup", "sector": "learning", "cost": 50, "coin_type": "learning_coins", "description": "2x XP for your next study session"},
+            ]
+        elif sector == "mind":
+            default_items = [
+                {"id": str(uuid.uuid4()), "name": "Zen Stone Pet", "type": "pet", "sector": "mind", "cost": 500, "coin_type": "mind_coins", "description": "Peaceful meditation companion"},
+                {"id": str(uuid.uuid4()), "name": "Clarity Boost", "type": "powerup", "sector": "mind", "cost": 50, "coin_type": "mind_coins", "description": "2x XP for your next mindfulness activity"},
+            ]
+        elif sector == "faith":
+            default_items = [
+                {"id": str(uuid.uuid4()), "name": "Dove Pet", "type": "pet", "sector": "faith", "cost": 500, "coin_type": "faith_coins", "description": "Spiritual companion"},
+                {"id": str(uuid.uuid4()), "name": "Grace Boost", "type": "powerup", "sector": "faith", "cost": 50, "coin_type": "faith_coins", "description": "2x XP for your next faith activity"},
+            ]
+        elif sector == "cooking":
+            default_items = [
+                {"id": str(uuid.uuid4()), "name": "Chef Hat Pet", "type": "pet", "sector": "cooking", "cost": 500, "coin_type": "cooking_coins", "description": "Culinary companion"},
+                {"id": str(uuid.uuid4()), "name": "Taste Boost", "type": "powerup", "sector": "cooking", "cost": 50, "coin_type": "cooking_coins", "description": "2x XP for your next cooking session"},
+            ]
+        elif sector == "main":
+            default_items = [
+                {"id": str(uuid.uuid4()), "name": "Music Player", "type": "tool", "sector": "main", "cost": 1000, "coin_type": "coins", "description": "Play music while you work"},
+                {"id": str(uuid.uuid4()), "name": "Gold Trophy", "type": "trophy", "sector": "main", "cost": 500, "coin_type": "coins", "description": "Show off your achievements"},
+                {"id": str(uuid.uuid4()), "name": "Chill Beats", "type": "music", "sector": "main", "cost": 100, "coin_type": "coins", "description": "Relaxing background music"},
+            ]
+        
+        if default_items:
+            await db.shop_items.insert_many(default_items)
+            items = default_items
+    
     return items
 
 @api_router.post("/shop/purchase")
@@ -291,8 +400,29 @@ async def purchase_item(purchase: PurchaseRequest, current_user: User = Depends(
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     
-    if current_user.chore_coins < item["cost"]:
-        raise HTTPException(status_code=400, detail="Insufficient chore coins")
+    coin_field = item["coin_type"]
+    user_coins = getattr(current_user, coin_field)
+    
+    if user_coins < item["cost"]:
+        raise HTTPException(status_code=400, detail=f"Insufficient {coin_field}")
+    
+    update_doc = {coin_field: user_coins - item["cost"]}
+    
+    if item["type"] == "pet":
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$push": {"pets_owned": purchase.item_id}, "$set": update_doc}
+        )
+    elif item["type"] == "tool" and item["name"] == "Music Player":
+        update_doc["music_player_owned"] = True
+        await db.users.update_one({"id": current_user.id}, {"$set": update_doc})
+    elif item["type"] == "music":
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$push": {"music_tracks_owned": purchase.item_id}, "$set": update_doc}
+        )
+    else:
+        await db.users.update_one({"id": current_user.id}, {"$set": update_doc})
     
     inventory_doc = {
         "id": str(uuid.uuid4()),
@@ -300,16 +430,29 @@ async def purchase_item(purchase: PurchaseRequest, current_user: User = Depends(
         "item_id": purchase.item_id,
         "purchased_at": datetime.now(timezone.utc).isoformat()
     }
-    
     await db.user_inventory.insert_one(inventory_doc)
-    await db.users.update_one(
-        {"id": current_user.id},
-        {"$set": {"chore_coins": current_user.chore_coins - item["cost"]}}
-    )
     
     return {"success": True, "item": item}
 
-# Group routes
+# Achievement routes
+@api_router.get("/achievements")
+async def get_achievements(current_user: User = Depends(get_current_user)):
+    all_achievements = [
+        {"id": "first_activity", "name": "First Steps", "description": "Complete your first activity", "icon": "🎯"},
+        {"id": "level_5", "name": "Rising Star", "description": "Reach level 5", "icon": "⭐"},
+        {"id": "level_10", "name": "Dedicated", "description": "Reach level 10", "icon": "🏆"},
+        {"id": "streak_7", "name": "Week Warrior", "description": "Maintain a 7-day streak", "icon": "🔥"},
+        {"id": "streak_30", "name": "Month Master", "description": "Maintain a 30-day streak", "icon": "👑"},
+        {"id": "all_sectors", "name": "Renaissance", "description": "Try all sectors", "icon": "🎨"},
+        {"id": "rich", "name": "Wealthy", "description": "Earn 1000+ coins", "icon": "💰"},
+    ]
+    
+    return {
+        "unlocked": current_user.achievements,
+        "all": all_achievements
+    }
+
+# Group routes (keeping existing)
 @api_router.post("/groups/create", response_model=Group)
 async def create_group(group_data: GroupCreate, current_user: User = Depends(get_current_user)):
     group_id = str(uuid.uuid4())
@@ -354,7 +497,6 @@ async def get_my_group(current_user: User = Depends(get_current_user)):
     group = await db.groups.find_one({"id": current_user.group_id}, {"_id": 0})
     return group
 
-# Leaderboard routes
 @api_router.get("/leaderboard/{period}", response_model=List[LeaderboardEntry])
 async def get_leaderboard(period: str, current_user: User = Depends(get_current_user)):
     if not current_user.group_id:
@@ -386,11 +528,11 @@ async def get_leaderboard(period: str, current_user: User = Depends(get_current_
         if period == "lifetime":
             xp = user["accountable_xp"]
         else:
-            chores = await db.chores.find({
+            activities = await db.activities.find({
                 "user_id": member_id,
                 "completed_at": {"$gte": start_time.isoformat()}
             }, {"_id": 0}).to_list(1000)
-            xp = sum(chore["xp_earned"] for chore in chores)
+            xp = sum(activity["xp_earned"] for activity in activities)
         
         leaderboard.append({
             "username": user["username"],
