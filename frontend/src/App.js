@@ -11,12 +11,15 @@ import ChoresSector from '@/pages/ChoresSector';
 import GenericSectorPage from '@/pages/GenericSectorPage';
 import Shop from '@/pages/Shop';
 import GenericSectorShop from '@/pages/GenericSectorShop';
+import MainShop from '@/pages/MainShop';
 import Leaderboard from '@/pages/Leaderboard';
 import Groups from '@/pages/Groups';
 import Settings from '@/pages/Settings';
 import Achievements from '@/pages/Achievements';
 import PocketGames from '@/pages/PocketGames';
 import PocketTools from '@/pages/PocketTools';
+import MusicPlayer from '@/components/MusicPlayer';
+import PetAnimation from '@/components/PetAnimation';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -40,6 +43,8 @@ function AppContent() {
   return (
     <div className="App">
       <Toaster position="top-center" richColors />
+      <MusicPlayer />
+      <PetAnimation />
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -105,6 +110,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <PocketTools />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/main-shop"
+            element={
+              <ProtectedRoute>
+                <MainShop />
               </ProtectedRoute>
             }
           />

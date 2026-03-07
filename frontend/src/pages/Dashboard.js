@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Coins, Flame, TrendingUp, Lock, Settings, Trophy, ChevronDown, ChevronUp, Award } from 'lucide-react';
+import { Sparkles, Coins, Flame, TrendingUp, Lock, Settings, Trophy, ChevronDown, ChevronUp, Award, ShoppingBag } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 
@@ -162,7 +162,15 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
+          <Button
+            onClick={() => navigate('/main-shop')}
+            className={`${isPlayful ? 'rounded-full' : 'rounded-md'}`}
+            data-testid="main-shop-button"
+          >
+            <ShoppingBag className="w-4 h-4 mr-2" />
+            Shop
+          </Button>
           <Button
             onClick={() => navigate('/leaderboard')}
             className={`${isPlayful ? 'rounded-full' : 'rounded-md'}`}
@@ -170,7 +178,7 @@ export default function Dashboard() {
             data-testid="leaderboard-button"
           >
             <Trophy className="w-4 h-4 mr-2" />
-            Leaderboard
+            Board
           </Button>
           <Button
             onClick={() => navigate('/achievements')}
@@ -179,7 +187,7 @@ export default function Dashboard() {
             data-testid="achievements-button"
           >
             <Award className="w-4 h-4 mr-2" />
-            Achievements
+            Awards
           </Button>
           <Button
             onClick={() => navigate('/settings')}
