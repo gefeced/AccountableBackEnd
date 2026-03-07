@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
@@ -17,9 +17,15 @@ export default function PocketGames() {
   const { user, token, refreshUser } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isPlayful = theme === 'playful';
 
-  const [activeGame, setActiveGame] = useState('tictactoe');
+  const [activeGame, setActiveGame] = useState(searchParams.get('tab') || 'tictactoe');
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) setActiveGame(tab);
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen pb-24">
@@ -160,10 +166,18 @@ function ChessGame({ isPlayful, user, token, refreshUser }) {
   const [game, setGame] = useState(new Chess());
   const [gamePosition, setGamePosition] = useState(game.fen());
 
-  const makeMove = (move) => {
+  function onDrop(sourceSquare, targetSquare) {
     const gameCopy = new Chess(game.fen());
-    const result = gameCopy.move(move);
-    if (result) {
+    
+    try {
+      const move = gameCopy.move({
+        from: sourceSquare,
+        to: targetSquare,
+        promotion: 'q'
+      });
+
+      if (move === null) return false;
+
       setGame(gameCopy);
       setGamePosition(gameCopy.fen());
       
@@ -177,18 +191,12 @@ function ChessGame({ isPlayful, user, token, refreshUser }) {
           ).then(() => refreshUser()).catch(console.error);
         }
       }
-    }
-    return result;
-  };
 
-  const onDrop = (sourceSquare, targetSquare) => {
-    const move = makeMove({
-      from: sourceSquare,
-      to: targetSquare,
-      promotion: 'q'
-    });
-    return move !== null;
-  };
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
 
   const resetGame = () => {
     const newGame = new Chess();
@@ -203,12 +211,16 @@ function ChessGame({ isPlayful, user, token, refreshUser }) {
           position={gamePosition}
           onPieceDrop={onDrop}
           boardWidth={Math.min(400, window.innerWidth - 100)}
+          customBoardStyle={{
+            borderRadius: isPlayful ? '1.5rem' : '0.5rem',
+            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)'
+          }}
         />
       </div>
 
       <div className="text-center space-y-2">
         <p className="text-sm text-muted-foreground">
-          {game.isCheckmate() ? 'Checkmate!' : game.isCheck() ? 'Check!' : `${game.turn() === 'w' ? 'White' : 'Black'} to move`}
+          {game.isCheckmate() ? '🏆 Checkmate!' : game.isCheck() ? '⚠️ Check!' : `${game.turn() === 'w' ? 'White' : 'Black'} to move`}
         </p>
         <Button onClick={resetGame} className={isPlayful ? 'rounded-full' : 'rounded-md'}>
           New Game

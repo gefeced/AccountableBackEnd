@@ -229,37 +229,66 @@ export default function Dashboard() {
         {/* Pocket Tools */}
         <div>
           <h2 className="text-2xl font-bold mb-4">Pocket Accountable Tools</h2>
-          <motion.div
-            whileHover={isPlayful ? { scale: 1.02 } : {}}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => navigate('/tools')}
-            className={`bg-card p-8 border cursor-pointer ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'} text-center hover:bg-secondary/50 transition-colors`}
-            data-testid="pocket-tools"
-          >
-            <div className="text-5xl mb-4">🛠️</div>
-            <h3 className="text-xl font-bold mb-2">Calendar & Calculator</h3>
-            <p className="text-muted-foreground">
-              Plan your schedule and use handy tools!
-            </p>
-          </motion.div>
+          <div className="grid grid-cols-2 gap-4">
+            <motion.div
+              whileHover={isPlayful ? { scale: 1.05 } : {}}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/tools?tab=calendar')}
+              className={`bg-card p-6 border cursor-pointer ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'} text-center hover:bg-secondary/50 transition-colors`}
+              data-testid="tool-calendar"
+            >
+              <div className="text-4xl mb-2">📅</div>
+              <p className="font-bold text-lg">Calendar</p>
+            </motion.div>
+            <motion.div
+              whileHover={isPlayful ? { scale: 1.05 } : {}}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/tools?tab=calculator')}
+              className={`bg-card p-6 border cursor-pointer ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'} text-center hover:bg-secondary/50 transition-colors`}
+              data-testid="tool-calculator"
+            >
+              <div className="text-4xl mb-2">🔢</div>
+              <p className="font-bold text-lg">Calculator</p>
+            </motion.div>
+          </div>
         </div>
 
         {/* Pocket Games */}
         <div>
           <h2 className="text-2xl font-bold mb-4">Pocket Games</h2>
-          <motion.div
-            whileHover={isPlayful ? { scale: 1.02 } : {}}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => navigate('/games')}
-            className={`bg-card p-8 border cursor-pointer ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'} text-center hover:bg-secondary/50 transition-colors`}
-            data-testid="pocket-games"
-          >
-            <div className="text-5xl mb-4">🎮</div>
-            <h3 className="text-xl font-bold mb-2">Chess, Tic-Tac-Toe & More</h3>
-            <p className="text-muted-foreground">
-              Play fun mini-games to earn coins!
-            </p>
-          </motion.div>
+          <div className="grid grid-cols-2 gap-4">
+            <motion.div
+              whileHover={isPlayful ? { scale: 1.05 } : {}}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/games?tab=tictactoe')}
+              className={`bg-card p-6 border cursor-pointer ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'} text-center hover:bg-secondary/50 transition-colors`}
+              data-testid="game-tictactoe"
+            >
+              <div className="text-4xl mb-2">⭕</div>
+              <p className="font-bold text-lg">Tic-Tac-Toe</p>
+            </motion.div>
+            <motion.div
+              whileHover={isPlayful ? { scale: 1.05 } : {}}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/games?tab=chess')}
+              className={`bg-card p-6 border cursor-pointer ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'} text-center hover:bg-secondary/50 transition-colors`}
+              data-testid="game-chess"
+            >
+              <div className="text-4xl mb-2">♟️</div>
+              <p className="font-bold text-lg">Chess</p>
+            </motion.div>
+            <motion.div
+              whileHover={isPlayful ? { scale: 1.05 } : {}}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/games?tab=checkers')}
+              className={`bg-card p-6 border cursor-pointer ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'} text-center hover:bg-secondary/50 transition-colors opacity-60`}
+              data-testid="game-checkers"
+            >
+              <div className="text-4xl mb-2">⚫</div>
+              <p className="font-bold text-lg">Checkers</p>
+              <p className="text-xs text-muted-foreground mt-1">Coming Soon</p>
+            </motion.div>
+          </div>
         </div>
       </div>
     </div>

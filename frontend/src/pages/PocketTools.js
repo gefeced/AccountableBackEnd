@@ -1,17 +1,26 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Calendar as CalendarIcon, Plus, Trash2 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
+import { toast } from 'sonner';
 
 export default function PocketTools() {
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isPlayful = theme === 'playful';
-  const [activeTool, setActiveTool] = useState('calendar');
+  const [activeTool, setActiveTool] = useState(searchParams.get('tab') || 'calendar');
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) setActiveTool(tab);
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen pb-24">
@@ -62,32 +71,83 @@ function CalendarTool({ isPlayful }) {
     const saved = localStorage.getItem('accountable-events');
     return saved ? JSON.parse(saved) : [];
   });
-  const [newEvent, setNewEvent] = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    time: '09:00',
+    priority: 'medium',
+    tag: 'personal',
+    color: '#3b82f6'
+  });
+
+  const tagColors = {
+    personal: '#3b82f6',
+    work: '#ef4444',
+    health: '#10b981',
+    learning: '#8b5cf6',
+    other: '#f59e0b'
+  };
 
   const addEvent = () => {
-    if (!newEvent.trim()) return;
+    if (!newEvent.title.trim()) {
+      toast.error('Please enter a title');
+      return;
+    }
+    if (!date) {
+      toast.error('Please select a date');
+      return;
+    }
 
     const event = {
       id: Date.now(),
       date: date.toISOString().split('T')[0],
-      title: newEvent
+      title: newEvent.title,
+      time: newEvent.time,
+      priority: newEvent.priority,
+      tag: newEvent.tag,
+      color: tagColors[newEvent.tag]
     };
 
     const updated = [...events, event];
     setEvents(updated);
     localStorage.setItem('accountable-events', JSON.stringify(updated));
-    setNewEvent('');
+    setNewEvent({ title: '', time: '09:00', priority: 'medium', tag: 'personal', color: '#3b82f6' });
+    setShowAddForm(false);
+    toast.success('Event added!');
   };
 
   const deleteEvent = (id) => {
     const updated = events.filter(e => e.id !== id);
     setEvents(updated);
     localStorage.setItem('accountable-events', JSON.stringify(updated));
+    toast.success('Event deleted');
   };
 
-  const selectedDateEvents = events.filter(
-    e => e.date === date.toISOString().split('T')[0]
-  );
+  const getEventsForDate = (checkDate) => {
+    if (!checkDate) return [];
+    const dateStr = checkDate.toISOString().split('T')[0];
+    return events.filter(e => e.date === dateStr);
+  };
+
+  const selectedDateEvents = date ? getEventsForDate(date) : [];
+
+  const getPriorityColor = (priority) => {
+    switch(priority) {
+      case 'high': return 'text-red-500';
+      case 'medium': return 'text-yellow-500';
+      case 'low': return 'text-green-500';
+      default: return 'text-muted-foreground';
+    }
+  };
+
+  const getPriorityLabel = (priority) => {
+    switch(priority) {
+      case 'high': return '🔴 High';
+      case 'medium': return '🟡 Medium';
+      case 'low': return '🟢 Low';
+      default: return priority;
+    }
+  };
 
   return (
     <div className="py-6 space-y-6">
@@ -95,56 +155,161 @@ function CalendarTool({ isPlayful }) {
         <Calendar
           mode="single"
           selected={date}
-          onSelect={setDate}
+          onSelect={(newDate) => {
+            if (newDate) {
+              setDate(newDate);
+            }
+          }}
           className="rounded-md border"
+          modifiers={{
+            hasEvents: (day) => getEventsForDate(day).length > 0
+          }}
+          modifiersStyles={{
+            hasEvents: {
+              fontWeight: 'bold',
+              backgroundColor: 'hsl(var(--primary) / 0.2)'
+            }
+          }}
         />
       </div>
 
       <div>
-        <h3 className="font-bold mb-3">
-          Events for {date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-        </h3>
-
-        <div className="flex gap-2 mb-4">
-          <Input
-            value={newEvent}
-            onChange={(e) => setNewEvent(e.target.value)}
-            placeholder="Add a plan or schedule..."
-            onKeyPress={(e) => e.key === 'Enter' && addEvent()}
-            data-testid="event-input"
-          />
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold">
+            Events for {date ? date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Selected Date'}
+          </h3>
           <Button
-            onClick={addEvent}
+            size="sm"
+            onClick={() => setShowAddForm(!showAddForm)}
             className={isPlayful ? 'rounded-full' : 'rounded-md'}
-            data-testid="add-event-button"
+            data-testid="toggle-add-form"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 mr-1" />
+            Add Event
           </Button>
         </div>
+
+        {showAddForm && (
+          <div className={`mb-4 p-4 border ${isPlayful ? 'rounded-2xl' : 'rounded-lg'} space-y-3`}>
+            <div>
+              <Label htmlFor="event-title">Title *</Label>
+              <Input
+                id="event-title"
+                value={newEvent.title}
+                onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
+                placeholder="Event title..."
+                data-testid="event-title-input"
+                className="mt-1"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="event-time">Time</Label>
+                <Input
+                  id="event-time"
+                  type="time"
+                  value={newEvent.time}
+                  onChange={(e) => setNewEvent({...newEvent, time: e.target.value})}
+                  data-testid="event-time-input"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="event-priority">Priority</Label>
+                <Select
+                  value={newEvent.priority}
+                  onValueChange={(value) => setNewEvent({...newEvent, priority: value})}
+                >
+                  <SelectTrigger className="mt-1" data-testid="event-priority-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">🔴 High</SelectItem>
+                    <SelectItem value="medium">🟡 Medium</SelectItem>
+                    <SelectItem value="low">🟢 Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="event-tag">Tag/Category</Label>
+              <Select
+                value={newEvent.tag}
+                onValueChange={(value) => setNewEvent({...newEvent, tag: value, color: tagColors[value]})}
+              >
+                <SelectTrigger className="mt-1" data-testid="event-tag-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="personal">🔵 Personal</SelectItem>
+                  <SelectItem value="work">🔴 Work</SelectItem>
+                  <SelectItem value="health">🟢 Health</SelectItem>
+                  <SelectItem value="learning">🟣 Learning</SelectItem>
+                  <SelectItem value="other">🟠 Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={addEvent}
+                className={`flex-1 ${isPlayful ? 'rounded-full' : 'rounded-md'}`}
+                data-testid="add-event-submit"
+              >
+                Add Event
+              </Button>
+              <Button
+                onClick={() => setShowAddForm(false)}
+                variant="outline"
+                className={isPlayful ? 'rounded-full' : 'rounded-md'}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-2">
           {selectedDateEvents.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
-              No events for this day. Add one above!
+              No events for this day. Click "Add Event" to create one!
             </p>
           ) : (
-            selectedDateEvents.map(event => (
-              <div
-                key={event.id}
-                className={`flex items-center justify-between p-3 border ${isPlayful ? 'rounded-2xl' : 'rounded-lg'}`}
-                data-testid={`event-${event.id}`}
-              >
-                <span>{event.title}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => deleteEvent(event.id)}
-                  data-testid={`delete-event-${event.id}`}
+            selectedDateEvents
+              .sort((a, b) => a.time.localeCompare(b.time))
+              .map(event => (
+                <div
+                  key={event.id}
+                  className={`flex items-start justify-between p-4 border-l-4 ${isPlayful ? 'rounded-r-2xl' : 'rounded-r-lg'} bg-card`}
+                  style={{ borderLeftColor: event.color }}
+                  data-testid={`event-${event.id}`}
                 >
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </Button>
-              </div>
-            ))
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold">{event.title}</span>
+                      <span className={`text-xs ${getPriorityColor(event.priority)}`}>
+                        {getPriorityLabel(event.priority)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                      <span>🕐 {event.time}</span>
+                      <span className="capitalize">📁 {event.tag}</span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deleteEvent(event.id)}
+                    data-testid={`delete-event-${event.id}`}
+                    className="ml-2"
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+              ))
           )}
         </div>
       </div>
