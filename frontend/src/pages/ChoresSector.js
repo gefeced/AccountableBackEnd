@@ -59,7 +59,7 @@ export default function ChoresSector() {
 
   const fetchRecentChores = async () => {
     try {
-      const response = await axios.get(`${API}/chores`, {
+      const response = await axios.get(`${API}/activities/chores`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setRecentChores(response.data.slice(0, 5));
@@ -104,8 +104,8 @@ export default function ChoresSector() {
     setLoading(true);
     try {
       const response = await axios.post(
-        `${API}/chores`,
-        { title, description, duration: durationSeconds },
+        `${API}/activities`,
+        { title, description, duration: durationSeconds, sector: 'chores' },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -140,8 +140,8 @@ export default function ChoresSector() {
 
   if (!user) return null;
 
-  const choreXpForNextLevel = Math.pow(user.chore_level, 2) * 100;
-  const choreXpProgress = (user.chore_xp % choreXpForNextLevel) / choreXpForNextLevel * 100;
+  const choreXpForNextLevel = Math.pow(user.chores_level, 2) * 100;
+  const choreXpProgress = (user.chores_xp % choreXpForNextLevel) / choreXpForNextLevel * 100;
 
   return (
     <div className="min-h-screen pb-24">
@@ -158,7 +158,7 @@ export default function ChoresSector() {
           </Button>
           <h1 className="text-3xl font-bold">Chores</h1>
           <Button
-            onClick={() => navigate('/shop')}
+            onClick={() => navigate('/shop/chores')}
             className={`${isPlayful ? 'rounded-full' : 'rounded-md'} px-6`}
             data-testid="shop-button"
           >
@@ -172,23 +172,23 @@ export default function ChoresSector() {
           <div className={`bg-card p-6 border ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'}`} data-testid="chore-xp-card">
             <Sparkles className="w-8 h-8 text-primary mb-2" />
             <p className="text-sm text-muted-foreground">Chore XP</p>
-            <p className="text-2xl font-bold text-foreground">{user.chore_xp}</p>
+            <p className="text-2xl font-bold text-foreground">{user.chores_xp}</p>
           </div>
 
           <div className={`bg-card p-6 border ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'}`} data-testid="chore-coins-card">
             <Coins className="w-8 h-8 text-accent mb-2" />
             <p className="text-sm text-muted-foreground">Chore Coins</p>
-            <p className="text-2xl font-bold text-foreground">{user.chore_coins}</p>
+            <p className="text-2xl font-bold text-foreground">{user.chores_coins}</p>
           </div>
 
           <div className={`col-span-2 bg-card p-6 border ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'}`} data-testid="chore-level-card">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm text-muted-foreground">Chore Level</p>
-              <p className="text-2xl font-bold">Level {user.chore_level}</p>
+              <p className="text-2xl font-bold">Level {user.chores_level}</p>
             </div>
             <Progress value={choreXpProgress} className="h-4" />
             <p className="text-xs text-muted-foreground mt-2">
-              {Math.floor(choreXpProgress)}% to Level {user.chore_level + 1}
+              {Math.floor(choreXpProgress)}% to Level {user.chores_level + 1}
             </p>
           </div>
         </div>

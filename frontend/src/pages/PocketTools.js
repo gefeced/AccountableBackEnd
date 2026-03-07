@@ -320,31 +320,77 @@ function CalendarTool({ isPlayful }) {
 // Calculator Tool
 function CalculatorTool({ isPlayful }) {
   const [display, setDisplay] = useState('0');
-  const [equation, setEquation] = useState('');
+  const [previousValue, setPreviousValue] = useState(null);
+  const [operation, setOperation] = useState(null);
+  const [waitingForOperand, setWaitingForOperand] = useState(false);
 
   const handleNumber = (num) => {
-    setDisplay(display === '0' ? num : display + num);
+    if (waitingForOperand) {
+      setDisplay(num);
+      setWaitingForOperand(false);
+    } else {
+      setDisplay(display === '0' ? num : display + num);
+    }
   };
 
-  const handleOperator = (op) => {
-    setEquation(display + ' ' + op + ' ');
-    setDisplay('0');
+  const handleOperator = (nextOperator) => {
+    const inputValue = parseFloat(display);
+
+    if (previousValue === null) {
+      setPreviousValue(inputValue);
+    } else if (operation) {
+      const currentValue = previousValue || 0;
+      const newValue = performCalculation(currentValue, inputValue, operation);
+      
+      setDisplay(String(newValue));
+      setPreviousValue(newValue);
+    }
+
+    setWaitingForOperand(true);
+    setOperation(nextOperator);
+  };
+
+  const performCalculation = (firstValue, secondValue, op) => {
+    switch (op) {
+      case '+':
+        return firstValue + secondValue;
+      case '-':
+        return firstValue - secondValue;
+      case '*':
+        return firstValue * secondValue;
+      case '/':
+        return firstValue / secondValue;
+      default:
+        return secondValue;
+    }
   };
 
   const calculate = () => {
-    try {
-      const result = eval(equation + display);
-      setDisplay(String(result));
-      setEquation('');
-    } catch (error) {
-      setDisplay('Error');
-      setEquation('');
+    const inputValue = parseFloat(display);
+
+    if (previousValue !== null && operation) {
+      const newValue = performCalculation(previousValue, inputValue, operation);
+      setDisplay(String(newValue));
+      setPreviousValue(null);
+      setOperation(null);
+      setWaitingForOperand(true);
     }
   };
 
   const clear = () => {
     setDisplay('0');
-    setEquation('');
+    setPreviousValue(null);
+    setOperation(null);
+    setWaitingForOperand(false);
+  };
+
+  const handleDecimal = () => {
+    if (waitingForOperand) {
+      setDisplay('0.');
+      setWaitingForOperand(false);
+    } else if (display.indexOf('.') === -1) {
+      setDisplay(display + '.');
+    }
   };
 
   const buttonClass = `h-16 text-lg font-semibold border ${isPlayful ? 'rounded-2xl' : 'rounded-lg'} hover:bg-secondary transition-colors`;
@@ -353,8 +399,12 @@ function CalculatorTool({ isPlayful }) {
     <div className="py-6">
       <div className="max-w-sm mx-auto">
         <div className={`mb-4 p-4 border ${isPlayful ? 'rounded-2xl' : 'rounded-lg'} bg-secondary`}>
-          {equation && <p className="text-sm text-muted-foreground">{equation}</p>}
-          <p className="text-3xl font-bold text-right" data-testid="calculator-display">{display}</p>
+          <p className="text-3xl font-bold text-right break-all" data-testid="calculator-display">{display}</p>
+          {previousValue !== null && operation && (
+            <p className="text-sm text-muted-foreground text-right mt-1">
+              {previousValue} {operation}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-4 gap-2">
@@ -370,7 +420,7 @@ function CalculatorTool({ isPlayful }) {
           <button onClick={() => handleNumber('4')} className={buttonClass} data-testid="calc-4">4</button>
           <button onClick={() => handleNumber('5')} className={buttonClass} data-testid="calc-5">5</button>
           <button onClick={() => handleNumber('6')} className={buttonClass} data-testid="calc-6">6</button>
-          <button onClick={() => handleNumber('+')} className={buttonClass} data-testid="calc-plus">+</button>
+          <button onClick={() => handleOperator('+')} className={buttonClass} data-testid="calc-plus">+</button>
 
           <button onClick={() => handleNumber('1')} className={buttonClass} data-testid="calc-1">1</button>
           <button onClick={() => handleNumber('2')} className={buttonClass} data-testid="calc-2">2</button>
@@ -378,7 +428,7 @@ function CalculatorTool({ isPlayful }) {
           <button onClick={calculate} className={`${buttonClass} row-span-2 bg-primary text-primary-foreground`} data-testid="calc-equals">=</button>
 
           <button onClick={() => handleNumber('0')} className={`${buttonClass} col-span-2`} data-testid="calc-0">0</button>
-          <button onClick={() => handleNumber('.')} className={buttonClass} data-testid="calc-dot">.</button>
+          <button onClick={handleDecimal} className={buttonClass} data-testid="calc-dot">.</button>
         </div>
       </div>
     </div>

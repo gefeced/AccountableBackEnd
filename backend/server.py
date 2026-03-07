@@ -81,6 +81,7 @@ class User(BaseModel):
     pets_owned: List[str] = []
     music_player_owned: bool = False
     music_tracks_owned: List[str] = []
+    active_previews: Dict[str, str] = {}  # item_id -> expiration ISO string
 
 class ActivityCreate(BaseModel):
     title: str
@@ -114,6 +115,10 @@ class ShopItem(BaseModel):
     image_url: Optional[str] = None
 
 class PurchaseRequest(BaseModel):
+    item_id: str
+    sector: Optional[str] = None
+
+class PreviewRequest(BaseModel):
     item_id: str
     sector: Optional[str] = None
 
@@ -229,13 +234,14 @@ async def register(user_data: UserRegister):
         "achievements": [],
         "pets_owned": [],
         "music_player_owned": False,
-        "music_tracks_owned": []
+        "music_tracks_owned": [],
+        "active_previews": {}
     }
     
     await db.users.insert_one(user_doc)
     token = create_access_token({"sub": user_id})
     
-    user_response = {k: v for k, v in user_doc.items() if k != "password"}
+    user_response = {k: v for k, v in user_doc.items() if k not in ["password", "_id"]}
     return {"token": token, "user": user_response}
 
 @api_router.post("/auth/login")
@@ -433,6 +439,96 @@ async def purchase_item(purchase: PurchaseRequest, current_user: User = Depends(
     await db.user_inventory.insert_one(inventory_doc)
     
     return {"success": True, "item": item}
+
+PREVIEW_COST = 10  # Coins
+PREVIEW_DURATION_SECONDS = 150  # 2.5 minutes
+
+@api_router.post("/shop/preview")
+async def preview_item(preview: PreviewRequest, current_user: User = Depends(get_current_user)):
+    """Start a preview of a shop item for 2.5 minutes, costs 10 coins"""
+    item = await db.shop_items.find_one({"id": preview.item_id}, {"_id": 0})
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    
+    # Determine which coin type to use
+    if preview.sector and preview.sector != "main":
+        coin_field = f"{preview.sector}_coins"
+    else:
+        coin_field = "coins"
+    
+    user_coins = getattr(current_user, coin_field, 0)
+    
+    if user_coins < PREVIEW_COST:
+        raise HTTPException(status_code=400, detail=f"Insufficient coins. Preview costs {PREVIEW_COST} coins.")
+    
+    # Check if already in active preview
+    active_previews = current_user.active_previews or {}
+    if preview.item_id in active_previews:
+        expiration = datetime.fromisoformat(active_previews[preview.item_id])
+        if expiration > datetime.now(timezone.utc):
+            remaining = (expiration - datetime.now(timezone.utc)).total_seconds()
+            return {
+                "success": True,
+                "already_active": True,
+                "item": item,
+                "expires_at": active_previews[preview.item_id],
+                "remaining_seconds": int(remaining)
+            }
+    
+    # Deduct coins and set preview expiration
+    expiration = datetime.now(timezone.utc) + timedelta(seconds=PREVIEW_DURATION_SECONDS)
+    
+    await db.users.update_one(
+        {"id": current_user.id},
+        {
+            "$set": {
+                coin_field: user_coins - PREVIEW_COST,
+                f"active_previews.{preview.item_id}": expiration.isoformat()
+            }
+        }
+    )
+    
+    return {
+        "success": True,
+        "already_active": False,
+        "item": item,
+        "expires_at": expiration.isoformat(),
+        "remaining_seconds": PREVIEW_DURATION_SECONDS,
+        "cost_deducted": PREVIEW_COST
+    }
+
+@api_router.get("/shop/previews")
+async def get_active_previews(current_user: User = Depends(get_current_user)):
+    """Get all active previews for the current user"""
+    active_previews = current_user.active_previews or {}
+    now = datetime.now(timezone.utc)
+    
+    # Filter out expired previews and calculate remaining time
+    valid_previews = []
+    expired_ids = []
+    
+    for item_id, expires_at in active_previews.items():
+        expiration = datetime.fromisoformat(expires_at)
+        if expiration > now:
+            item = await db.shop_items.find_one({"id": item_id}, {"_id": 0})
+            if item:
+                remaining = (expiration - now).total_seconds()
+                valid_previews.append({
+                    "item": item,
+                    "expires_at": expires_at,
+                    "remaining_seconds": int(remaining)
+                })
+        else:
+            expired_ids.append(item_id)
+    
+    # Clean up expired previews
+    if expired_ids:
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$unset": {f"active_previews.{item_id}": "" for item_id in expired_ids}}
+        )
+    
+    return {"previews": valid_previews}
 
 # Achievement routes
 @api_router.get("/achievements")

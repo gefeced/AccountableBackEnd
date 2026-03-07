@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ShoppingCart, Sparkles, Coins, Eye, X } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Sparkles, Coins, Eye, X, Timer } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+const PREVIEW_COST = 10;
 
 const SECTOR_CONFIG = {
   chores: { name: 'Chores', icon: '🧹' },
@@ -31,7 +32,9 @@ export default function GenericSectorShop() {
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(null);
   const [previewingItem, setPreviewingItem] = useState(null);
-  const [previewedItems, setPreviewedItems] = useState(new Set());
+  const [activePreviews, setActivePreviews] = useState({});
+  const [previewTimers, setPreviewTimers] = useState({});
+  const timerIntervalRef = useRef(null);
 
   const sectorConfig = SECTOR_CONFIG[sector] || SECTOR_CONFIG.chores;
   const sectorCoinsField = `${sector}_coins`;
@@ -42,7 +45,48 @@ export default function GenericSectorShop() {
       return;
     }
     fetchShopItems();
+    fetchActivePreviews();
   }, [user, sector]);
+
+  // Timer countdown effect
+  useEffect(() => {
+    if (Object.keys(activePreviews).length > 0) {
+      timerIntervalRef.current = setInterval(() => {
+        setPreviewTimers(prev => {
+          const updated = { ...prev };
+          let hasChanges = false;
+          
+          Object.keys(activePreviews).forEach(itemId => {
+            const expiresAt = new Date(activePreviews[itemId].expires_at);
+            const now = new Date();
+            const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
+            
+            if (remaining !== prev[itemId]) {
+              updated[itemId] = remaining;
+              hasChanges = true;
+            }
+            
+            if (remaining === 0 && prev[itemId] > 0) {
+              toast.info('Preview expired!');
+              setActivePreviews(current => {
+                const newPreviews = { ...current };
+                delete newPreviews[itemId];
+                return newPreviews;
+              });
+            }
+          });
+          
+          return hasChanges ? updated : prev;
+        });
+      }, 1000);
+    }
+    
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [activePreviews]);
 
   const fetchShopItems = async () => {
     try {
@@ -57,49 +101,73 @@ export default function GenericSectorShop() {
     }
   };
 
+  const fetchActivePreviews = async () => {
+    try {
+      const response = await axios.get(`${API}/shop/previews`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const previewsMap = {};
+      const timersMap = {};
+      response.data.previews.forEach(preview => {
+        previewsMap[preview.item.id] = preview;
+        timersMap[preview.item.id] = preview.remaining_seconds;
+      });
+      setActivePreviews(previewsMap);
+      setPreviewTimers(timersMap);
+    } catch (error) {
+      console.error('Failed to fetch active previews:', error);
+    }
+  };
+
   const handlePreview = async (item) => {
-    if (previewedItems.has(item.id)) {
-      if (user.coins < 10) {
-        toast.error('Need 10 coins to preview again!');
-        return;
-      }
+    if (activePreviews[item.id] && previewTimers[item.id] > 0) {
+      setPreviewingItem({ ...item, isActivePreview: true, remainingTime: previewTimers[item.id] });
+      return;
+    }
+
+    const userCoins = user[sectorCoinsField] || 0;
+    if (userCoins < PREVIEW_COST) {
+      toast.error(`Insufficient ${sectorConfig.name} coins! Preview costs ${PREVIEW_COST} coins.`);
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${API}/shop/preview`,
+        { item_id: item.id, sector },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       
-      try {
-        await axios.patch(
-          `${API}/user/profile`,
-          { coins: user.coins - 10 },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+      if (response.data.success) {
+        const previewData = {
+          item: response.data.item,
+          expires_at: response.data.expires_at,
+          remaining_seconds: response.data.remaining_seconds
+        };
+        
+        setActivePreviews(prev => ({ ...prev, [item.id]: previewData }));
+        setPreviewTimers(prev => ({ ...prev, [item.id]: response.data.remaining_seconds }));
+        
+        if (!response.data.already_active) {
+          toast.success(`Preview started! You have 2.5 minutes to try "${item.name}"`);
+        }
+        
+        setPreviewingItem({ ...item, isActivePreview: true, remainingTime: response.data.remaining_seconds });
         await refreshUser();
-        toast.success('Preview unlocked! -10 coins');
-        setPreviewingItem(item);
-      } catch (error) {
-        toast.error('Failed to unlock preview');
       }
-    } else {
-      if (user.coins < 10) {
-        toast.error('Need 10 coins to preview!');
-        return;
-      }
-      
-      try {
-        await axios.patch(
-          `${API}/user/profile`,
-          { coins: user.coins - 10 },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        await refreshUser();
-        toast.success('Preview unlocked! -10 coins');
-        setPreviewingItem(item);
-        setPreviewedItems(new Set([...previewedItems, item.id]));
-      } catch (error) {
-        toast.error('Failed to unlock preview');
-      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to start preview');
     }
   };
 
   const closePreview = () => {
     setPreviewingItem(null);
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handlePurchase = async (item) => {
@@ -199,6 +267,20 @@ export default function GenericSectorShop() {
                   </Button>
                 </div>
 
+                {/* Active Preview Timer */}
+                {previewingItem.isActivePreview && previewTimers[previewingItem.id] > 0 && (
+                  <div className="bg-green-500/20 border border-green-500 rounded-lg p-4 mb-6 text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Timer className="w-5 h-5 text-green-500" />
+                      <span className="text-green-500 font-bold">Preview Active!</span>
+                    </div>
+                    <p className="text-3xl font-bold text-green-500">
+                      {formatTime(previewTimers[previewingItem.id])}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">Time remaining</p>
+                  </div>
+                )}
+
                 <div className="text-center mb-6">
                   {previewingItem.type === 'pet' && <span className="text-9xl block mb-4">🐾</span>}
                   {previewingItem.type === 'powerup' && <Sparkles className="w-24 h-24 text-primary mx-auto mb-4" />}
@@ -211,7 +293,7 @@ export default function GenericSectorShop() {
                 </p>
 
                 <div className="bg-secondary p-4 rounded-lg mb-6 text-center">
-                  <p className="text-sm text-muted-foreground mb-1">Price</p>
+                  <p className="text-sm text-muted-foreground mb-1">Full Purchase Price</p>
                   <div className="flex items-center justify-center gap-2">
                     <Coins className="w-6 h-6 text-accent" />
                     <span className="text-3xl font-bold">{previewingItem.cost}</span>
@@ -276,16 +358,28 @@ export default function GenericSectorShop() {
                         ? 'Purchase'
                         : 'Insufficient Coins'}
                     </Button>
-                    <Button
-                      onClick={() => handlePreview(item)}
-                      variant="outline"
-                      disabled={user.coins < 10}
-                      className={`w-full ${isPlayful ? 'rounded-full' : 'rounded-md'}`}
-                      data-testid={`preview-button-${item.id}`}
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      {previewedItems.has(item.id) ? 'Preview Again (10 coins)' : 'Preview (10 coins)'}
-                    </Button>
+                    {activePreviews[item.id] && previewTimers[item.id] > 0 ? (
+                      <Button
+                        onClick={() => handlePreview(item)}
+                        variant="outline"
+                        className={`w-full ${isPlayful ? 'rounded-full' : 'rounded-md'} border-green-500 text-green-500`}
+                        data-testid={`preview-button-${item.id}`}
+                      >
+                        <Timer className="w-4 h-4 mr-2" />
+                        Preview Active: {formatTime(previewTimers[item.id])}
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => handlePreview(item)}
+                        variant="outline"
+                        className={`w-full ${isPlayful ? 'rounded-full' : 'rounded-md'}`}
+                        data-testid={`preview-button-${item.id}`}
+                        disabled={(user[sectorCoinsField] || 0) < PREVIEW_COST}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Preview ({PREVIEW_COST} {sectorConfig.name} coins)
+                      </Button>
+                    )}
                   </motion.div>
                 );
               })}
