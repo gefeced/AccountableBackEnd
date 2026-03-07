@@ -31,7 +31,7 @@ export default function Shop() {
 
   const fetchShopItems = async () => {
     try {
-      const response = await axios.get(`${API}/shop/items`, {
+      const response = await axios.get(`${API}/shop/items/chores`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setItems(response.data);
@@ -43,7 +43,7 @@ export default function Shop() {
   };
 
   const handlePurchase = async (item) => {
-    if (user.chore_coins < item.cost) {
+    if (user.chores_coins < item.cost) {
       toast.error('Insufficient chore coins!');
       return;
     }
@@ -100,7 +100,7 @@ export default function Shop() {
           <div className="flex items-center justify-between text-primary-foreground">
             <div>
               <p className="text-sm opacity-90">Your Chore Coins</p>
-              <p className="text-4xl font-bold">{user.chore_coins}</p>
+              <p className="text-4xl font-bold">{user.chores_coins}</p>
             </div>
             <Coins className="w-12 h-12 opacity-80" />
           </div>
@@ -112,7 +112,7 @@ export default function Shop() {
             <h2 className="text-2xl font-bold mb-4 capitalize">{type}s</h2>
             <div className="grid gap-4">
               {typeItems.map((item) => {
-                const canAfford = user.chore_coins >= item.cost;
+                const canAfford = user.chores_coins >= item.cost;
                 return (
                   <motion.div
                     key={item.id}
