@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { motion } from 'framer-motion';
-import { Sparkles, Coins, Flame, TrendingUp, Lock, Settings, Trophy } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, Coins, Flame, TrendingUp, Lock, Settings, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 
@@ -21,6 +21,7 @@ export default function Dashboard() {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const isPlayful = theme === 'playful';
+  const [coinsExpanded, setCoinsExpanded] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -61,10 +62,10 @@ export default function Dashboard() {
           {/* XP Card */}
           <motion.div
             whileHover={isPlayful ? { scale: 1.02 } : {}}
-            className={`col-span-2 bg-gradient-to-br from-primary to-accent p-6 ${isPlayful ? 'rounded-[1.5rem] playful-shadow' : 'rounded-lg clean-shadow'}`}
+            className={`col-span-2 bg-primary p-6 ${isPlayful ? 'rounded-[1.5rem] playful-shadow' : 'rounded-lg clean-shadow'}`}
             data-testid="xp-card"
           >
-            <div className="flex items-center justify-between text-white">
+            <div className="flex items-center justify-between text-primary-foreground">
               <div>
                 <p className="text-sm opacity-90">Total Accountable XP</p>
                 <p className="text-4xl font-bold">{user.accountable_xp}</p>
@@ -85,26 +86,78 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {/* Coins Card */}
+          {/* Coins Card with Expandable Breakdown */}
           <motion.div
             whileHover={isPlayful ? { scale: 1.05 } : {}}
-            className={`bg-card p-6 border ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'}`}
+            className={`col-span-2 bg-card p-6 border ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'}`}
             data-testid="coins-card"
           >
-            <Coins className="w-8 h-8 text-accent mb-2" />
-            <p className="text-sm text-muted-foreground">Coins</p>
-            <p className="text-2xl font-bold">{user.coins}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Coins className="w-10 h-10 text-accent" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Coins</p>
+                  <p className="text-3xl font-bold text-foreground">{user.coins}</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCoinsExpanded(!coinsExpanded)}
+                className={isPlayful ? 'rounded-full' : 'rounded-md'}
+                data-testid="expand-coins-button"
+              >
+                {coinsExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+              </Button>
+            </div>
+            
+            <AnimatePresence>
+              {coinsExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="mt-4 pt-4 border-t space-y-3 overflow-hidden"
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Chore Coins</span>
+                    <span className="text-lg font-bold text-foreground">{user.chore_coins}</span>
+                  </div>
+                  <div className="flex justify-between items-center opacity-50">
+                    <span className="text-sm text-muted-foreground">Fitness Coins</span>
+                    <span className="text-lg font-bold text-foreground">0</span>
+                  </div>
+                  <div className="flex justify-between items-center opacity-50">
+                    <span className="text-sm text-muted-foreground">Learning Coins</span>
+                    <span className="text-lg font-bold text-foreground">0</span>
+                  </div>
+                  <div className="flex justify-between items-center opacity-50">
+                    <span className="text-sm text-muted-foreground">Cooking Coins</span>
+                    <span className="text-lg font-bold text-foreground">0</span>
+                  </div>
+                  <div className="flex justify-between items-center opacity-50">
+                    <span className="text-sm text-muted-foreground">Mind Coins</span>
+                    <span className="text-lg font-bold text-foreground">0</span>
+                  </div>
+                  <div className="flex justify-between items-center opacity-50">
+                    <span className="text-sm text-muted-foreground">Faith Coins</span>
+                    <span className="text-lg font-bold text-foreground">0</span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
 
           {/* Streak Card */}
           <motion.div
             whileHover={isPlayful ? { scale: 1.05 } : {}}
-            className={`bg-card p-6 border ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'}`}
+            className={`col-span-2 bg-card p-6 border ${isPlayful ? 'playful-border playful-shadow rounded-[1.5rem]' : 'clean-border clean-shadow rounded-lg'}`}
             data-testid="streak-card"
           >
             <Flame className="w-8 h-8 text-orange-500 mb-2" />
-            <p className="text-sm text-muted-foreground">Streak</p>
-            <p className="text-2xl font-bold">{user.streak} days</p>
+            <p className="text-sm text-muted-foreground">Daily Streak</p>
+            <p className="text-2xl font-bold text-foreground">{user.streak} days</p>
           </motion.div>
         </div>
 

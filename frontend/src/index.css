@@ -6,31 +6,31 @@
 
 @layer base {
     .theme-playful {
-        --background: 48 100% 96%;
-        --foreground: 260 20% 20%;
+        --background: 200 100% 97%;
+        --foreground: 220 30% 15%;
         --card: 0 0% 100%;
-        --card-foreground: 260 20% 20%;
+        --card-foreground: 220 30% 15%;
         --popover: 0 0% 100%;
-        --popover-foreground: 260 20% 20%;
-        --primary: 262 83% 58%;
+        --popover-foreground: 220 30% 15%;
+        --primary: 217 91% 60%;
         --primary-foreground: 0 0% 100%;
-        --secondary: 48 100% 92%;
-        --secondary-foreground: 260 20% 20%;
-        --muted: 48 100% 92%;
-        --muted-foreground: 260 20% 45%;
-        --accent: 35 92% 65%;
-        --accent-foreground: 260 20% 20%;
+        --secondary: 200 100% 94%;
+        --secondary-foreground: 220 30% 15%;
+        --muted: 200 100% 94%;
+        --muted-foreground: 220 20% 45%;
+        --accent: 38 92% 50%;
+        --accent-foreground: 0 0% 100%;
         --destructive: 0 84.2% 60.2%;
         --destructive-foreground: 0 0% 98%;
-        --border: 262 83% 90%;
-        --input: 262 83% 90%;
-        --ring: 262 83% 58%;
+        --border: 217 91% 85%;
+        --input: 217 91% 85%;
+        --ring: 217 91% 60%;
         --radius: 1.5rem;
-        --chart-1: 262 83% 58%;
-        --chart-2: 35 92% 65%;
-        --chart-3: 197 37% 24%;
-        --chart-4: 43 74% 66%;
-        --chart-5: 27 87% 67%;
+        --chart-1: 217 91% 60%;
+        --chart-2: 38 92% 50%;
+        --chart-3: 340 82% 52%;
+        --chart-4: 142 76% 36%;
+        --chart-5: 280 65% 60%;
     }
 
     .theme-clean {

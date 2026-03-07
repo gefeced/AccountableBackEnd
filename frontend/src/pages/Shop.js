@@ -96,8 +96,8 @@ export default function Shop() {
         </div>
 
         {/* Balance */}
-        <div className={`bg-gradient-to-br from-accent to-primary p-6 ${isPlayful ? 'rounded-[1.5rem] playful-shadow' : 'rounded-lg clean-shadow'}`}>
-          <div className="flex items-center justify-between text-white">
+        <div className={`bg-primary p-6 ${isPlayful ? 'rounded-[1.5rem] playful-shadow' : 'rounded-lg clean-shadow'}`}>
+          <div className="flex items-center justify-between text-primary-foreground">
             <div>
               <p className="text-sm opacity-90">Your Chore Coins</p>
               <p className="text-4xl font-bold">{user.chore_coins}</p>

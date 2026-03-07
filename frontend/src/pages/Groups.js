@@ -133,8 +133,8 @@ export default function Groups() {
         {group ? (
           /* Current Group */
           <div>
-            <div className={`bg-gradient-to-br from-primary to-accent p-6 mb-6 ${isPlayful ? 'rounded-[1.5rem] playful-shadow' : 'rounded-lg clean-shadow'}`}>
-              <div className="text-white">
+            <div className={`bg-primary p-6 mb-6 ${isPlayful ? 'rounded-[1.5rem] playful-shadow' : 'rounded-lg clean-shadow'}`}>
+              <div className="text-primary-foreground">
                 <Users className="w-10 h-10 mb-3 opacity-90" />
                 <h2 className="text-2xl font-bold mb-2">{group.name}</h2>
                 <p className="text-sm opacity-90 mb-4">{group.members.length} member{group.members.length !== 1 ? 's' : ''}</p>
