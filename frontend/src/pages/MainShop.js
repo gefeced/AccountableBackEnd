@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
-import { motion } from 'framer-motion';
-import { ArrowLeft, ShoppingCart, Coins, Music, Trophy, Award } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, ShoppingCart, Coins, Music, Trophy, Award, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 
@@ -20,6 +20,8 @@ export default function MainShop() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(null);
+  const [previewingItem, setPreviewingItem] = useState(null);
+  const [previewedItems, setPreviewedItems] = useState(new Set());
 
   useEffect(() => {
     if (!user) {
@@ -40,6 +42,54 @@ export default function MainShop() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePreview = async (item) => {
+    if (previewedItems.has(item.id)) {
+      // Already previewed, need to pay again
+      if (user.coins < 10) {
+        toast.error('Need 10 coins to preview again!');
+        return;
+      }
+      
+      try {
+        // Deduct 10 coins
+        await axios.patch(
+          `${API}/user/profile`,
+          { coins: user.coins - 10 },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        await refreshUser();
+        toast.success('Preview unlocked! -10 coins');
+        setPreviewingItem(item);
+      } catch (error) {
+        toast.error('Failed to unlock preview');
+      }
+    } else {
+      // First time preview
+      if (user.coins < 10) {
+        toast.error('Need 10 coins to preview!');
+        return;
+      }
+      
+      try {
+        await axios.patch(
+          `${API}/user/profile`,
+          { coins: user.coins - 10 },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        await refreshUser();
+        toast.success('Preview unlocked! -10 coins');
+        setPreviewingItem(item);
+        setPreviewedItems(new Set([...previewedItems, item.id]));
+      } catch (error) {
+        toast.error('Failed to unlock preview');
+      }
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewingItem(null);
   };
 
   const handlePurchase = async (item) => {
@@ -116,6 +166,78 @@ export default function MainShop() {
           </div>
         </div>
 
+        {/* Preview Modal */}
+        <AnimatePresence>
+          {previewingItem && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+              onClick={closePreview}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className={`bg-card p-8 max-w-md w-full ${isPlayful ? 'rounded-[1.5rem]' : 'rounded-lg'} border-2 border-primary`}
+                data-testid="preview-modal"
+              >
+                <div className="flex justify-between items-start mb-6">
+                  <h2 className="text-2xl font-bold">{previewingItem.name}</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={closePreview}
+                    data-testid="close-preview"
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
+
+                <div className="text-center mb-6">
+                  {previewingItem.type === 'tool' && (
+                    <Music className="w-24 h-24 text-primary mx-auto mb-4" />
+                  )}
+                  {previewingItem.type === 'trophy' && (
+                    <Trophy className="w-24 h-24 text-yellow-500 mx-auto mb-4" />
+                  )}
+                  {previewingItem.type === 'badge' && (
+                    <Award className="w-24 h-24 text-blue-500 mx-auto mb-4" />
+                  )}
+                  {previewingItem.type === 'music' && (
+                    <span className="text-9xl block mb-4">🎵</span>
+                  )}
+                </div>
+
+                <p className="text-center text-muted-foreground mb-6">
+                  {previewingItem.description}
+                </p>
+
+                <div className="bg-secondary p-4 rounded-lg mb-6 text-center">
+                  <p className="text-sm text-muted-foreground mb-1">Price</p>
+                  <div className="flex items-center justify-center gap-2">
+                    <Coins className="w-6 h-6 text-accent" />
+                    <span className="text-3xl font-bold">{previewingItem.cost}</span>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={() => {
+                    closePreview();
+                    handlePurchase(previewingItem);
+                  }}
+                  className={`w-full ${isPlayful ? 'rounded-full' : 'rounded-md'}`}
+                  disabled={user.coins < previewingItem.cost}
+                >
+                  Purchase Now
+                </Button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Shop Items */}
         {Object.entries(itemsByType).map(([type, typeItems]) => (
           <div key={type}>
@@ -151,7 +273,7 @@ export default function MainShop() {
                     <Button
                       onClick={() => handlePurchase(item)}
                       disabled={!canAfford || purchasing === item.id || isOwned}
-                      className={`w-full ${isPlayful ? 'rounded-full' : 'rounded-md'}`}
+                      className={`w-full ${isPlayful ? 'rounded-full' : 'rounded-md'} mb-2`}
                       data-testid={`purchase-button-${item.id}`}
                     >
                       <ShoppingCart className="w-4 h-4 mr-2" />
@@ -162,6 +284,16 @@ export default function MainShop() {
                         : canAfford
                         ? 'Purchase'
                         : 'Insufficient Coins'}
+                    </Button>
+                    <Button
+                      onClick={() => handlePreview(item)}
+                      variant="outline"
+                      disabled={user.coins < 10}
+                      className={`w-full ${isPlayful ? 'rounded-full' : 'rounded-md'}`}
+                      data-testid={`preview-button-${item.id}`}
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      {previewedItems.has(item.id) ? 'Preview Again (10 coins)' : 'Preview (10 coins)'}
                     </Button>
                   </motion.div>
                 );

@@ -162,42 +162,46 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-4 gap-3">
-          <Button
-            onClick={() => navigate('/main-shop')}
-            className={`${isPlayful ? 'rounded-full' : 'rounded-md'}`}
-            data-testid="main-shop-button"
-          >
-            <ShoppingBag className="w-4 h-4 mr-2" />
-            Shop
-          </Button>
-          <Button
-            onClick={() => navigate('/leaderboard')}
-            className={`${isPlayful ? 'rounded-full' : 'rounded-md'}`}
-            variant="outline"
-            data-testid="leaderboard-button"
-          >
-            <Trophy className="w-4 h-4 mr-2" />
-            Board
-          </Button>
-          <Button
-            onClick={() => navigate('/achievements')}
-            className={`${isPlayful ? 'rounded-full' : 'rounded-md'}`}
-            variant="outline"
-            data-testid="achievements-button"
-          >
-            <Award className="w-4 h-4 mr-2" />
-            Awards
-          </Button>
-          <Button
-            onClick={() => navigate('/settings')}
-            className={`${isPlayful ? 'rounded-full' : 'rounded-md'}`}
-            variant="outline"
-            data-testid="settings-button"
-          >
-            <Settings className="w-4 h-4 mr-2" />
-            Settings
-          </Button>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              onClick={() => navigate('/main-shop')}
+              className={`${isPlayful ? 'rounded-full' : 'rounded-md'} h-14`}
+              data-testid="main-shop-button"
+            >
+              <ShoppingBag className="w-5 h-5 mr-2" />
+              Shop
+            </Button>
+            <Button
+              onClick={() => navigate('/leaderboard')}
+              className={`${isPlayful ? 'rounded-full' : 'rounded-md'} h-14`}
+              variant="outline"
+              data-testid="leaderboard-button"
+            >
+              <Trophy className="w-5 h-5 mr-2" />
+              Board
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              onClick={() => navigate('/achievements')}
+              className={`${isPlayful ? 'rounded-full' : 'rounded-md'} h-14`}
+              variant="outline"
+              data-testid="achievements-button"
+            >
+              <Award className="w-5 h-5 mr-2" />
+              Awards
+            </Button>
+            <Button
+              onClick={() => navigate('/settings')}
+              className={`${isPlayful ? 'rounded-full' : 'rounded-md'} h-14`}
+              variant="outline"
+              data-testid="settings-button"
+            >
+              <Settings className="w-5 h-5 mr-2" />
+              Settings
+            </Button>
+          </div>
         </div>
 
         {/* Sectors */}
